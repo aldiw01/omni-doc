@@ -16,6 +16,8 @@ export async function POST(req: NextRequest) {
     }
 
     const currentMessage = messages[messages.length - 1].content;
+    const chatHistory = messages.slice(0, -1).map((m: any) => `${m.role === 'user' ? 'User' : 'Omni-Doc'}: ${m.content}`).join("\n");
+    const searchQuery = messages.slice(-3).map((m: any) => m.content).join(" ");
     const llmProvider = (process.env.LLM_PROVIDER as 'google' | 'ollama') || 'ollama';
 
     const embeddings = getEmbeddings({ provider: llmProvider });
@@ -32,7 +34,7 @@ export async function POST(req: NextRequest) {
       try {
         const table = await db.openTable(tableName);
         const vectorStore = new LanceDB(embeddings, { table });
-        const results = await vectorStore.maxMarginalRelevanceSearch(currentMessage, { k: 15, fetchK: 50 });
+        const results = await vectorStore.maxMarginalRelevanceSearch(searchQuery, { k: 15, fetchK: 50 });
 
         if (results.length > 0) {
           context = results.map(r => `[Source: ${r.metadata.folderPath}${r.metadata.relativePath}]:\n${r.pageContent}`).join("\n\n---\n\n");
@@ -45,7 +47,16 @@ export async function POST(req: NextRequest) {
     }
 
     const prompt = ChatPromptTemplate.fromMessages([
-      ["system", "You are Omni-Doc, an advanced AI capable of analyzing and synthesizing information across thousands of documents.\n\nCRITICAL INSTRUCTIONS:\n- You must synthesize a comprehensive answer using ONLY the provided Context.\n- The context is drawn from multiple diverse sources. Identify broad themes if applicable.\n- If the answer is not in the Context, state clearly that you do not have enough information.\n- Be helpful, structured, and format your output beautifully in Markdown."],
+      ["system", `You are Omni-Doc, an advanced AI capable of analyzing and synthesizing information across thousands of documents.
+
+CRITICAL INSTRUCTIONS:
+- You must synthesize a comprehensive answer using ONLY the provided Context.
+- The context is drawn from multiple diverse sources. Identify broad themes if applicable.
+- If the answer is not in the Context, state clearly that you do not have enough information.
+- Be helpful, structured, and format your output beautifully in Markdown.
+
+Previous Conversation History:
+{history}`],
       ["human", "Context:\n{context}\n\nQuestion: {question}"]
     ]);
 
@@ -53,6 +64,7 @@ export async function POST(req: NextRequest) {
     const chain = prompt.pipe(llm).pipe(new StringOutputParser());
 
     const stream = await chain.stream({
+      history: chatHistory || "No previous history.",
       context: context,
       question: currentMessage,
     });
