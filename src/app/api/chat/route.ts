@@ -30,7 +30,8 @@ export async function POST(req: NextRequest) {
     
     if (tableNames.includes(tableName)) {
       try {
-        const vectorStore = new LanceDB(embeddings, { uri: dbDir, tableName });
+        const table = await db.openTable(tableName);
+        const vectorStore = new LanceDB(embeddings, { table });
         const results = await vectorStore.similaritySearch(currentMessage, 4);
         
         if (results.length > 0) {
