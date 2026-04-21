@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       try {
         const table = await db.openTable(tableName);
         const vectorStore = new LanceDB(embeddings, { table });
-        const results = await vectorStore.maxMarginalRelevanceSearch(searchQuery, { k: 15, fetchK: 50 });
+        const results = await vectorStore.similaritySearch(searchQuery, 15);
 
         if (results.length > 0) {
           context = results.map(r => `[Source: ${r.metadata.folderPath}${r.metadata.relativePath}]:\n${r.pageContent}`).join("\n\n---\n\n");
