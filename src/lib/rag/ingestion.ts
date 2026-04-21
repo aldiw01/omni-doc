@@ -126,7 +126,7 @@ export async function ingestDocuments(provider: 'google' | 'ollama') {
 
   console.log("Generating embeddings and inserting into LanceDB in batches...");
   
-  const batchSize = 100;
+  const batchSize = 20; // Lowered from 100 to prevent Ollama memory crashes
   let vectorStore: LanceDB | null = null;
   
   for (let i = 0; i < sanitizedDocs.length; i += batchSize) {
